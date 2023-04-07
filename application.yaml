@@ -1,0 +1,70 @@
+api-module: c
+
+base:
+  application:
+    name: biz-envoy-c
+  api:
+    prefix: api
+  server:
+    enable: true
+    port: 18002
+    gin:
+      mode: debug
+    response:
+      print:
+        enable: false
+
+  redis:
+    enable: true
+    password: ZljIsysc0re123
+    standalone:
+      addr: redis-service:26379
+
+  datasource:
+    username: isyscore
+    password: Isysc0re
+    host: mysql-service
+    port: 23306
+    driver-name: mysql
+    db-name: isc_demo
+    # 示例：charset=utf8&parseTime=True&loc=Local 等url后面的配置，直接配置即可
+    url-config:
+      charset: utf8
+      parseTime: True
+      loc: Local
+
+  etcd:
+    enable: true
+    endpoints:
+      - etcd-service:22379
+    username: isyscore
+    password: Isysc0re
+    dial-timeout: 5s
+
+  endpoint:
+    config:
+      enable: true
+    health:
+      enable: true
+
+  # 链路的追踪部分
+  tracing:
+    enable: true
+    collector-endpoint: http://isc-core-back-service:31300/api/core/back/v1/middle/spans
+    redis:
+      enable: true
+    etcd:
+      enable: true
+    orm:
+      enable: true
+
+biz:
+  url:
+    # localhost 是使用Envoy
+    # f: http://localhost:18005
+    # biz-f-service 则不走Envoy
+    f: http://biz-f-service:18005
+
+file:
+  save:
+    path: "/app/"

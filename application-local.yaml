@@ -1,0 +1,60 @@
+api-module: c
+
+base:
+  application:
+    name: biz-envoy-c
+  api:
+    prefix: api
+  server:
+    # 是否启用，默认：true
+    enable: true
+    # 端口号
+    port: 18012
+    # web框架gin的配置
+    gin:
+      # 有三种模式：debug/release/test，填错则使用release
+      mode: debug
+  redis:
+    enable: true
+    password: ZljIsysc0re123
+    standalone:
+#      addr: redis-service:6379
+      addr: 10.30.30.78:26379
+
+  datasource:
+    username: isyscore
+    password: Isysc0re
+    host: 10.30.30.78
+    port: 23306
+    driver-name: mysql
+    db-name: isc_demo
+    # 示例：charset=utf8&parseTime=True&loc=Local 等url后面的配置，直接配置即可
+    url-config:
+      charset: utf8
+      parseTime: True
+      loc: Local
+
+  etcd:
+    enable: true
+    endpoints:
+      - 10.30.30.78:52379
+    username: root
+    password: ZljIsysc0re123
+    dial-timeout: 5s
+  # 链路的追踪部分
+  tracing:
+    enable: false
+    collector-endpoint: http://isc-core-back-service:31300/api/core/back/v1/middle/spans
+    redis:
+      enable: true
+    etcd:
+      enable: true
+    orm:
+      enable: true
+biz:
+  url:
+    f: http://localhost:18015
+
+file:
+  save:
+    path: "/Users/zhouzhenyong/tem/envoy/"

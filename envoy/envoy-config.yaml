@@ -1,0 +1,160 @@
+node:
+  cluster: default
+  id: biz-c-service
+admin:
+  access_log_path: /var/log/envoy/admin_access.log
+  profile_path: /var/log/envoy/envoy.prof
+  address:
+    socket_address:
+      protocol: TCP
+      address: 0.0.0.0
+      port_value: 9901
+
+dynamic_resources:
+  ads_config:
+    api_type: GRPC
+    transport_api_version: V3
+    grpc_services:
+      - envoy_grpc:
+          cluster_name: cluster_xds
+  cds_config:
+    resource_api_version: V3
+    ads: {}
+  lds_config:
+    resource_api_version: V3
+    ads: {}
+
+static_resources:
+  clusters:
+    - type: STRICT_DNS
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http2_protocol_options: {}
+      name: cluster_xds
+      load_assignment:
+        cluster_name: cluster_xds
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: isc-envoy-control-service
+                      port_value: 11000
+    - name: cluster_local
+      type: STRICT_DNS
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: cluster_local
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: 127.0.0.1
+                      port_value: 18002
+    - name: cluster-core-back
+      type: STRICT_DNS
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: cluster-core-back
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: isc-core-back-service
+                      port_value: 31300
+  listeners:
+    - name: listener_ingress
+      address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: 10000
+      access_log:
+        - name: envoy.access_loggers.file
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+            path: /var/log/envoy/ingress.log
+            log_format:
+              json_format:
+                start_time: "[%START_TIME%]"
+                method: "%REQ(:METHOD)%"
+                path: "%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%"
+                protocol: "%PROTOCOL%"
+                response_code: "%RESPONSE_CODE%"
+                response_flags: "%RESPONSE_FLAGS%"
+                bytes_received: "%BYTES_RECEIVED%"
+                bytes_sent: "%BYTES_SENT%"
+                duration: "%DURATION%"
+                upstream_service_time: "%RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)%"
+                forwarded_for: "%REQ(X-FORWARDED-FOR)%"
+                request_id: "%REQ(X-REQUEST-ID)%"
+                authority: "%REQ(:AUTHORITY)%"
+                upstream_host: "%UPSTREAM_HOST%"
+                response_code_details: "%RESPONSE_CODE_DETAILS%"
+                route_name: "%ROUTE_NAME%"
+                upstream_cluster: "%UPSTREAM_CLUSTER%"
+                downstream_remote_address: "%DOWNSTREAM_REMOTE_ADDRESS%"
+                dynamic_metadata: "%DYNAMIC_METADATA(com)%"
+                hostname: "%HOSTNAME%"
+
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                generate_request_id: true
+                tracing:
+                  provider:
+                    name: envoy.tracers.zipkin
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.config.trace.v3.ZipkinConfig
+                      collector_cluster: cluster-core-back
+                      collector_endpoint: "/api/core/back/v1/http/spans"
+                      collector_endpoint_version: HTTP_JSON
+                stat_prefix: http
+                access_log:
+                  - name: envoy.access_loggers.file
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+                      path: /var/log/envoy/ingress_http.log
+                      log_format: 
+                        json_format:
+                          start_time: "[%START_TIME%]"
+                          method: "%REQ(:METHOD)%"
+                          path: "%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%"
+                          protocol: "%PROTOCOL%"
+                          response_code: "%RESPONSE_CODE%"
+                          response_flags: "%RESPONSE_FLAGS%"
+                          bytes_received: "%BYTES_RECEIVED%"
+                          bytes_sent: "%BYTES_SENT%"
+                          duration: "%DURATION%"
+                          upstream_service_time: "%RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)%"
+                          forwarded_for: "%REQ(X-FORWARDED-FOR)%"
+                          request_id: "%REQ(X-REQUEST-ID)%"
+                          authority: "%REQ(:AUTHORITY)%"
+                          upstream_host: "%UPSTREAM_HOST%"
+                          response_code_details: "%RESPONSE_CODE_DETAILS%"
+                          route_name: "%ROUTE_NAME%"
+                          upstream_cluster: "%UPSTREAM_CLUSTER%"
+                          downstream_remote_address: "%DOWNSTREAM_REMOTE_ADDRESS%"
+                          dynamic_metadata: "%DYNAMIC_METADATA(com)%"
+                          hostname: "%HOSTNAME%"
+                route_config:
+                  name: route_local
+                  virtual_hosts:
+                    - name: route_local
+                      domains:
+                        - "*"
+                      routes:
+                        - match:
+                            #【每个业务不一样】业务处理的api前缀
+                            prefix: "/api/c/"
+                          route:
+                            cluster: cluster_local
+                          decorator:
+                            operation: checkAvailability
+                http_filters:
+                  - name: envoy.filters.http.router
